@@ -327,6 +327,7 @@ namespace AGS.Types
 
         [Description("Whether the character should be affected by walkable area scaling")]
         [Category("Appearance")]
+        [DefaultValue(true)]
         public bool UseRoomAreaScaling
         {
             get { return _useRoomAreaScaling; }
@@ -335,6 +336,7 @@ namespace AGS.Types
 
         [Description("Whether the character should be affected by walkable area lighting")]
         [Category("Appearance")]
+        [DefaultValue(true)]
         public bool UseRoomAreaLighting
         {
             get { return _useRoomAreaLighting; }
@@ -343,6 +345,7 @@ namespace AGS.Types
 
         [Description("Whether the character will turn on the spot to face their new direction before walking")]
         [Category("Movement")]
+        [DefaultValue(false)]
         public bool TurnBeforeWalking
         {
             get { return _turnBeforeWalking; }
@@ -351,6 +354,7 @@ namespace AGS.Types
 
         [Description("Whether the character will turn on the spot to face the new standing direction")]
         [Category("Movement")]
+        [DefaultValue(false)]
         public bool TurnWhenFacing
         {
             get { return _turnWhenFacing; }
@@ -359,6 +363,7 @@ namespace AGS.Types
 
         [Description("Specifies that the walking view is using loops 4-7 for diagonal directions")]
         [Category("Movement")]
+        [DefaultValue(false)]
         public bool DiagonalLoops
         {
             get { return _diagonalLoops; }
@@ -367,6 +372,7 @@ namespace AGS.Types
 
         [Description("Adjusts the character's movement speed in line with their scaling level")]
         [Category("Movement")]
+        [DefaultValue(false)]
         public bool AdjustSpeedWithScaling
         {
             get { return _adjustSpeedWithScaling; }
@@ -375,6 +381,7 @@ namespace AGS.Types
 
         [Description("Adjusts the volume of any frame-linked sounds depending on the character's scaling level")]
         [Category("Appearance")]
+        [DefaultValue(false)]
         public bool AdjustVolumeWithScaling
         {
             get { return _adjustVolumeWithScaling; }
@@ -383,6 +390,7 @@ namespace AGS.Types
 
         [Description("The character will only move when its animation frame changes (this avoids a 'gliding' effect)")]
         [Category("Movement")]
+        [DefaultValue(false)]
         public bool MovementLinkedToAnimation
         {
             get { return _movementLinkedToAnimation; }
