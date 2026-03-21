@@ -1593,7 +1593,7 @@ void DialogOptions::End()
         run_function_on_non_blocking_thread(&runDialogOptionCloseFunc);
     }
 
-    ccReleaseObjectReference(ccGetObjectHandleFromAddress(&ccDialogOptionsRendering));
+    ccReleaseObjectReference(ccGetObjectHandleFromAddress(ccDialogOptionsRendering));
     ccDialogOptionsRendering = nullptr; // disposed by the managed pool
 
     invalidate_screen();
