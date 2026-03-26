@@ -30,6 +30,15 @@ extern RoomStruct thisroom;
 extern SpriteCache spriteset;
 extern GameSetupStruct game;
 
+bool ScriptDrawingSurface::IsValid() const
+{
+    return (roomBackgroundNumber >= 0) ||
+        (roomMaskType > kRoomAreaNone) ||
+        (dynamicSpriteNumber >= 0) ||
+        (dynamicSurfaceNumber >= 0) ||
+        (linkedBitmapOnly != nullptr);
+}
+
 Bitmap* ScriptDrawingSurface::GetBitmapSurface()
 {
     // TODO: consider creating weak_ptr here, and store one in the DrawingSurface!
@@ -43,23 +52,7 @@ Bitmap* ScriptDrawingSurface::GetBitmapSurface()
         return linkedBitmapOnly;
     else if (roomMaskType > kRoomAreaNone)
         return thisroom.GetMask(roomMaskType);
-    quit("!DrawingSurface: attempted to use surface after its source image was disposed or DrawingSurface.Release() was called.");
     return nullptr;
-}
-
-Bitmap *ScriptDrawingSurface::StartDrawing()
-{
-    return this->GetBitmapSurface();
-}
-
-void ScriptDrawingSurface::FinishedDrawingReadOnly()
-{
-}
-
-void ScriptDrawingSurface::FinishedDrawing()
-{
-    FinishedDrawingReadOnly();
-    modified = 1;
 }
 
 int ScriptDrawingSurface::Dispose(void* /*address*/, bool /*force*/) {

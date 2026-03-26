@@ -37,14 +37,14 @@ struct ScriptDrawingSurface final : AGSCCDynamicObject {
     int Dispose(void *address, bool force) override;
     const char *GetType() override;
     void Unserialize(int index, AGS::Common::Stream *in, size_t data_sz) override;
+    bool IsValid() const;
     AGS::Common::Bitmap* GetBitmapSurface();
-    AGS::Common::Bitmap *StartDrawing();
+    AGS::Common::Bitmap *StartDrawing() { return this->GetBitmapSurface(); }
     void PointToGameResolution(int *xcoord, int *ycoord);
     void SizeToGameResolution(int *width, int *height);
     void SizeToGameResolution(int *adjustValue);
     void SizeToDataResolution(int *adjustValue);
-    void FinishedDrawing();
-    void FinishedDrawingReadOnly();
+    void FinishedDrawing() { modified = true; }
 
     void Invalidate();
 

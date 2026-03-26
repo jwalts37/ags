@@ -90,9 +90,33 @@ void ScriptDrawingSurface::SizeToDataResolution(int *valueToAdjust)
     *valueToAdjust = game_to_ctx_data_size(*valueToAdjust, highResCoordinates != 0);
 }
 
+Bitmap *GetAndAssertBitmapSurface(ScriptDrawingSurface *sds, const char *api_name)
+{
+    Bitmap *bmp = sds->GetBitmapSurface();
+    if (!bmp)
+    {
+        debug_script_warn("%s: attempted to use surface after its source image was disposed or DrawingSurface.Release() was called.",
+            api_name);
+    }
+    return bmp;
+}
+
+Bitmap *TryStartDrawing(ScriptDrawingSurface* sds, const char *api_name)
+{
+    Bitmap *bmp = sds->StartDrawing();
+    if (!bmp)
+    {
+        debug_script_warn("%s: attempted to use surface after its source image was disposed or DrawingSurface.Release() was called.",
+            api_name);
+    }
+    return bmp;
+}
+
 ScriptDrawingSurface* DrawingSurface_CreateCopy(ScriptDrawingSurface *sds)
 {
-    Bitmap *sourceBitmap = sds->GetBitmapSurface();
+    Bitmap *sourceBitmap = GetAndAssertBitmapSurface(sds, "DrawingSurface.CreateCopy");
+    if (!sourceBitmap)
+        return nullptr;
 
     for (int i = 0; i < MAX_DYNAMIC_SURFACES; i++)
     {
@@ -107,7 +131,7 @@ ScriptDrawingSurface* DrawingSurface_CreateCopy(ScriptDrawingSurface *sds)
         }
     }
 
-    quit("!DrawingSurface.CreateCopy: too many copied surfaces created");
+    debug_script_warn("!DrawingSurface.CreateCopy: too many surface copies created (max is %d)", MAX_DYNAMIC_SURFACES);
     return nullptr;
 }
 
@@ -115,7 +139,10 @@ void DrawingSurface_DrawImageImpl(ScriptDrawingSurface* sds, Bitmap* src,
     int dst_x, int dst_y, int trans, int dst_width, int dst_height,
     int src_x, int src_y, int src_width, int src_height, int sprite_id, bool src_has_alpha)
 {
-    Bitmap *ds = sds->GetBitmapSurface();
+    Bitmap *ds = GetAndAssertBitmapSurface(sds, "DrawingSurface.DrawImage");
+    if (!ds)
+        return;
+
     if (src == ds) {} // ignore for now; bitmap lib supports, and may be used for effects
         /* debug_script_warn("DrawingSurface.DrawImage: drawing onto itself"); */
     if (src->GetColorDepth() != ds->GetColorDepth())
@@ -203,7 +230,11 @@ void DrawingSurface_DrawSurface(ScriptDrawingSurface* target, ScriptDrawingSurfa
     int dst_x, int dst_y, int dst_width, int dst_height,
     int src_x, int src_y, int src_width, int src_height)
 {
-    DrawingSurface_DrawImageImpl(target, source->GetBitmapSurface(), dst_x, dst_y, trans, dst_width, dst_height,
+    Bitmap *source_bmp = GetAndAssertBitmapSurface(source, "DrawingSurface.DrawSurface");
+    if (!source_bmp)
+        return;
+
+    DrawingSurface_DrawImageImpl(target, source_bmp, dst_x, dst_y, trans, dst_width, dst_height,
         src_x, src_y, src_width, src_height, -1, source->hasAlphaChannel != 0);
 }
 
@@ -214,10 +245,10 @@ void DrawingSurface_DrawSurface2(ScriptDrawingSurface* target, ScriptDrawingSurf
 
 void DrawingSurface_SetDrawingColor(ScriptDrawingSurface *sds, int newColour) 
 {
+    Bitmap *ds = GetAndAssertBitmapSurface(sds, "DrawingSurface.DrawingColor");
+    if (!ds)
+        return;
     sds->currentColourScript = newColour;
-    // StartDrawing to set up ds to set the colour at the appropriate
-    // depth for the background
-    Bitmap *ds = sds->StartDrawing();
     if (newColour == SCR_COLOR_TRANSPARENT)
     {
         sds->currentColour = ds->GetMaskColor();
@@ -226,7 +257,6 @@ void DrawingSurface_SetDrawingColor(ScriptDrawingSurface *sds, int newColour)
     {
         sds->currentColour = ds->GetCompatibleColor(newColour);
     }
-    sds->FinishedDrawingReadOnly();
 }
 
 int DrawingSurface_GetDrawingColor(ScriptDrawingSurface *sds)
@@ -247,7 +277,9 @@ int DrawingSurface_GetUseHighResCoordinates(ScriptDrawingSurface *sds)
 
 int DrawingSurface_GetHeight(ScriptDrawingSurface *sds) 
 {
-    Bitmap *ds = sds->GetBitmapSurface();
+    Bitmap *ds = GetAndAssertBitmapSurface(sds, "DrawingSurface.Height");
+    if (!ds)
+        return 0;
     int height = ds->GetHeight();
     sds->SizeToGameResolution(&height);
     return height;
@@ -255,7 +287,9 @@ int DrawingSurface_GetHeight(ScriptDrawingSurface *sds)
 
 int DrawingSurface_GetWidth(ScriptDrawingSurface *sds) 
 {
-    Bitmap *ds = sds->GetBitmapSurface();
+    Bitmap *ds = GetAndAssertBitmapSurface(sds, "DrawingSurface.Width");
+    if (!ds)
+        return 0;
     int width = ds->GetWidth();
     sds->SizeToGameResolution(&width);
     return width;
@@ -263,7 +297,9 @@ int DrawingSurface_GetWidth(ScriptDrawingSurface *sds)
 
 void DrawingSurface_Clear(ScriptDrawingSurface *sds, int colour)
 {
-    Bitmap *ds = sds->StartDrawing();
+    Bitmap *ds = TryStartDrawing(sds, "DrawingSurface.Clear");
+    if (!ds)
+        return;
     int allegroColor;
     if ((colour == -SCR_NO_VALUE) || (colour == SCR_COLOR_TRANSPARENT))
     {
@@ -282,7 +318,9 @@ void DrawingSurface_DrawCircle(ScriptDrawingSurface *sds, int x, int y, int radi
     sds->PointToGameResolution(&x, &y);
     sds->SizeToGameResolution(&radius);
 
-    Bitmap *ds = sds->StartDrawing();
+    Bitmap *ds = TryStartDrawing(sds, "DrawingSurface.DrawCircle");
+    if (!ds)
+        return;
     ds->FillCircle(Circle(x, y, radius), sds->currentColour);
     sds->FinishedDrawing();
 }
@@ -292,7 +330,9 @@ void DrawingSurface_DrawRectangle(ScriptDrawingSurface *sds, int x1, int y1, int
     sds->PointToGameResolution(&x1, &y1);
     sds->PointToGameResolution(&x2, &y2);
 
-    Bitmap *ds = sds->StartDrawing();
+    Bitmap *ds = TryStartDrawing(sds, "DrawingSurface.DrawRectangle");
+    if (!ds)
+        return;
     ds->FillRect(Rect(x1,y1,x2,y2), sds->currentColour);
     sds->FinishedDrawing();
 }
@@ -303,7 +343,9 @@ void DrawingSurface_DrawTriangle(ScriptDrawingSurface *sds, int x1, int y1, int 
     sds->PointToGameResolution(&x2, &y2);
     sds->PointToGameResolution(&x3, &y3);
 
-    Bitmap *ds = sds->StartDrawing();
+    Bitmap *ds = TryStartDrawing(sds, "DrawingSurface.DrawTriangle");
+    if (!ds)
+        return;
     ds->DrawTriangle(Triangle(x1,y1,x2,y2,x3,y3), sds->currentColour);
     sds->FinishedDrawing();
 }
@@ -311,7 +353,9 @@ void DrawingSurface_DrawTriangle(ScriptDrawingSurface *sds, int x1, int y1, int 
 void DrawingSurface_DrawString(ScriptDrawingSurface *sds, int xx, int yy, int font, const char* text)
 {
     sds->PointToGameResolution(&xx, &yy);
-    Bitmap *ds = sds->StartDrawing();
+    Bitmap *ds = TryStartDrawing(sds, "DrawingSurface.DrawString");
+    if (!ds)
+        return;
     color_t text_color = sds->currentColour;
     if ((ds->GetColorDepth() <= 8) && (text_color > 255)) {
         text_color = ds->GetCompatibleColor(1);
@@ -335,7 +379,9 @@ void DrawingSurface_DrawStringWrapped(ScriptDrawingSurface *sds, int xx, int yy,
     if (break_up_text_into_lines(draw_text, Lines, wid, font) == 0)
         return;
 
-    Bitmap *ds = sds->StartDrawing();
+    Bitmap *ds = TryStartDrawing(sds, "DrawingSurface.DrawStringWrapped");
+    if (!ds)
+        return;
     color_t text_color = sds->currentColour;
     color_t outline_color = ds->GetCompatibleColor(play.speech_text_shadow);
 
@@ -364,7 +410,9 @@ void DrawingSurface_DrawLine(ScriptDrawingSurface *sds, int fromx, int fromy, in
     sds->PointToGameResolution(&tox, &toy);
     sds->SizeToGameResolution(&thickness);
     int ii,jj,xx,yy;
-    Bitmap *ds = sds->StartDrawing();
+    Bitmap *ds = TryStartDrawing(sds, "DrawingSurface.DrawLine");
+    if (!ds)
+        return;
     // draw several lines to simulate the thickness
     color_t draw_color = sds->currentColour;
     for (ii = 0; ii < thickness; ii++) 
@@ -384,7 +432,9 @@ void DrawingSurface_DrawPixel(ScriptDrawingSurface *sds, int x, int y) {
     int thickness = 1;
     sds->SizeToGameResolution(&thickness);
     int ii,jj;
-    Bitmap *ds = sds->StartDrawing();
+    Bitmap *ds = TryStartDrawing(sds, "DrawingSurface.DrawPixel");
+    if (!ds)
+        return;
     // draw several pixels to simulate the thickness
     color_t draw_color = sds->currentColour;
     for (ii = 0; ii < thickness; ii++) 
@@ -399,7 +449,9 @@ void DrawingSurface_DrawPixel(ScriptDrawingSurface *sds, int x, int y) {
 
 int DrawingSurface_GetPixel(ScriptDrawingSurface *sds, int x, int y) {
     sds->PointToGameResolution(&x, &y);
-    Bitmap *ds = sds->StartDrawing();
+    Bitmap *ds = GetAndAssertBitmapSurface(sds, "DrawingSurface.GetPixel");
+    if (!ds)
+        return 0;
     int rawPixel = ds->GetPixel(x, y);
     int maskColor = ds->GetMaskColor();
     int colDepth = ds->GetColorDepth();
@@ -416,7 +468,6 @@ int DrawingSurface_GetPixel(ScriptDrawingSurface *sds, int x, int y) {
         rawPixel = Game_GetColorFromRGB(r, g, b);
     }
 
-    sds->FinishedDrawingReadOnly();
     return rawPixel;
 }
 

@@ -352,9 +352,15 @@ ScriptDynamicSprite* DynamicSprite_CreateFromDrawingSurface(ScriptDrawingSurface
     //if (!spriteset.HasFreeSlots())
     //    return nullptr;
 
+    if (!sds->IsValid())
+    {
+        debug_script_warn("DynamicSprite.CreateFromDrawingSurface: attempted to use surface after its source image was disposed or DrawingSurface.Release() was called.");
+        return nullptr;
+    }
+
     if (width <= 0 || height <= 0)
     {
-        debug_script_warn("WARNING: DynamicSprite.CreateFromDrawingSurface: invalid size %d x %d, will adjust", width, height);
+        debug_script_warn("DynamicSprite.CreateFromDrawingSurface: invalid size %d x %d, will adjust", width, height);
         width = std::max(1, width);
         height = std::max(1, height);
     }
@@ -363,19 +369,16 @@ ScriptDynamicSprite* DynamicSprite_CreateFromDrawingSurface(ScriptDrawingSurface
     sds->PointToGameResolution(&x, &y);
     sds->SizeToGameResolution(&width, &height);
 
-    Bitmap *ds = sds->StartDrawing();
+    Bitmap *ds = sds->GetBitmapSurface();
     if ((x < 0) || (y < 0) || (x + width > ds->GetWidth()) || (y + height > ds->GetHeight()))
-        quit("!DynamicSprite.CreateFromDrawingSurface: requested area is outside the surface");
-
-    std::unique_ptr<Bitmap> new_pic(BitmapHelper::CreateBitmap(width, height, ds->GetColorDepth()));
-    if (!new_pic)
     {
-        sds->FinishedDrawingReadOnly();
-        return nullptr;
+        debug_script_warn("DynamicSprite.CreateFromDrawingSurface: requested area is outside the surface");
+        Math::ClampLength(x, width, 0, ds->GetWidth());
+        Math::ClampLength(y, height, 0, ds->GetHeight());
     }
 
+    std::unique_ptr<Bitmap> new_pic(BitmapHelper::CreateBitmap(width, height, ds->GetColorDepth()));
     new_pic->Blit(ds, x, y, 0, 0, width, height);
-    sds->FinishedDrawingReadOnly();
 
     int new_slot = add_dynamic_sprite(std::move(new_pic), (sds->hasAlphaChannel != 0));
     if (new_slot <= 0)
@@ -391,7 +394,7 @@ ScriptDynamicSprite* DynamicSprite_Create(int width, int height, int alphaChanne
 
     if (width <= 0 || height <= 0)
     {
-        debug_script_warn("WARNING: DynamicSprite.Create: invalid size %d x %d, will adjust", width, height);
+        debug_script_warn("DynamicSprite.Create: invalid size %d x %d, will adjust", width, height);
         width = std::max(1, width);
         height = std::max(1, height);
     }
