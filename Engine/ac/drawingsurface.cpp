@@ -285,6 +285,11 @@ int DrawingSurface_GetHeight(ScriptDrawingSurface *sds)
     return height;
 }
 
+bool DrawingSurface_GetValid(ScriptDrawingSurface *sds) 
+{
+    return sds->IsValid();
+}
+
 int DrawingSurface_GetWidth(ScriptDrawingSurface *sds) 
 {
     Bitmap *ds = GetAndAssertBitmapSurface(sds, "DrawingSurface.Width");
@@ -622,6 +627,11 @@ RuntimeScriptValue Sc_DrawingSurface_SetUseHighResCoordinates(void *self, const 
     API_OBJCALL_VOID_PINT(ScriptDrawingSurface, DrawingSurface_SetUseHighResCoordinates);
 }
 
+RuntimeScriptValue Sc_DrawingSurface_GetValid(void *self, const RuntimeScriptValue *params, int32_t param_count)
+{
+    API_OBJCALL_BOOL(ScriptDrawingSurface, DrawingSurface_GetValid);
+}
+
 // int (ScriptDrawingSurface *sds)
 RuntimeScriptValue Sc_DrawingSurface_GetWidth(void *self, const RuntimeScriptValue *params, int32_t param_count)
 {
@@ -669,6 +679,7 @@ void RegisterDrawingSurfaceAPI(ScriptAPIVersion base_api, ScriptAPIVersion /*com
         { "DrawingSurface::get_Height",           API_FN_PAIR(DrawingSurface_GetHeight) },
         { "DrawingSurface::get_UseHighResCoordinates", API_FN_PAIR(DrawingSurface_GetUseHighResCoordinates) },
         { "DrawingSurface::set_UseHighResCoordinates", API_FN_PAIR(DrawingSurface_SetUseHighResCoordinates) },
+        { "DrawingSurface::get_Valid",            API_FN_PAIR(DrawingSurface_GetValid) },
         { "DrawingSurface::get_Width",            API_FN_PAIR(DrawingSurface_GetWidth) },
     };
 

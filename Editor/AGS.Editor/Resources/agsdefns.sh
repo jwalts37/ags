@@ -772,6 +772,10 @@ builtin managed struct DrawingSurface {
 #endif // SCRIPT_COMPAT_v341
   /// Gets the width of the surface.
   readonly import attribute int Width;
+#ifdef SCRIPT_API_v363
+  /// Checks whether this drawing surface is currently valid and is linked to an actual image source.
+  import readonly attribute bool Valid;
+#endif
 };
 
 #ifdef SCRIPT_API_v3507
