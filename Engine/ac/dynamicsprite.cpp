@@ -11,6 +11,7 @@
 // https://opensource.org/license/artistic-2-0/
 //
 //=============================================================================
+#include <map>
 #include <math.h>
 #include "ac/dynamicsprite.h"
 #include "ac/common.h"
@@ -47,33 +48,13 @@ extern AGS::Engine::IGraphicsDriver *gfxDriver;
 
 char check_dynamic_sprites_at_exit = 1;
 
-// Dynamic sprite (slot index) map to DrawingSurface handle.
-// NOTE: I decided to put this separate from the ScriptDynamicSprite, because
-// statistically a reference to drawing surface is a temporary data present
-// in very small numbers (1-2) at one time; while there could be many hundreds
-// and thousands of dynamic sprites in game. Thus keeping a DrawingSurface ref
-// field in ScriptDynamicSprite will increase memory consumption in rates
-// which are highly unproportional to the actual needs.
-// TODO: of course this should not be a standalone global variable,
-// but put into some kind of a manager.
-std::unordered_map<int, int> DynamicSpriteDSRef;
-
 // ** SCRIPT DYNAMIC SPRITE
 
 void DynamicSprite_Delete(ScriptDynamicSprite *sds)
 {
     if (sds->slot > 0)
     {
-        // Invalidate DrawingSurface (if one is currently acquired)
-        auto ref_it = DynamicSpriteDSRef.find(sds->slot);
-        if (ref_it != DynamicSpriteDSRef.end())
-        {
-            ScriptDrawingSurface *surf = static_cast<ScriptDrawingSurface *>(ccGetObjectAddressFromHandle(ref_it->second));
-            if (surf)
-                surf->Invalidate();
-            DynamicSpriteDSRef.erase(ref_it);
-        }
-
+        detach_dynsprite_surface(sds->slot);
         free_dynamic_sprite(sds->slot);
         sds->slot = 0; // 0 is a "safety placeholder" sprite id
     }
@@ -82,24 +63,18 @@ void DynamicSprite_Delete(ScriptDynamicSprite *sds)
 ScriptDrawingSurface* DynamicSprite_GetDrawingSurface(ScriptDynamicSprite *dss)
 {
     // If there's already a active DrawingSurface, then return one
-    auto ref_it = DynamicSpriteDSRef.find(dss->slot);
-    if (ref_it != DynamicSpriteDSRef.end())
-    {
-        ScriptDrawingSurface *surface = static_cast<ScriptDrawingSurface*>(ccGetObjectAddressFromHandle(ref_it->second));
-        if (surface)
-            return surface;
-    }
+    ScriptDrawingSurface *surface = get_dynsprite_surface(dss->slot);
+    if (surface)
+        return surface;
 
-    ScriptDrawingSurface *surface = new ScriptDrawingSurface();
+    surface = new ScriptDrawingSurface();
     surface->dynamicSpriteNumber = dss->slot;
 
     if ((game.SpriteInfos[dss->slot].Flags & SPF_ALPHACHANNEL) != 0)
         surface->hasAlphaChannel = true;
 
     int handle = ccRegisterManagedObject(surface, surface);
-    DynamicSpriteDSRef[dss->slot] = handle;
-    // Mark the sprite info as having sprite's surface acquired (for notification purposes)
-    game.SpriteInfos[dss->slot].Flags |= SPF_SURFACEACQUIRED;
+    attach_dynsprite_surface(dss->slot, handle);
     return surface;
 }
 
@@ -530,6 +505,50 @@ void free_dynamic_sprite(int slot, bool notify_all)
         notify_sprite_changed(slot, true);
 }
 
+// Dynamic sprite (slot index) map to DrawingSurface handle.
+// NOTE: I decided to put this separate from the ScriptDynamicSprite, because
+// statistically a reference to drawing surface is a temporary data present
+// in very small numbers (1-2) at one time; while there could be many hundreds
+// and thousands of dynamic sprites in game. Thus keeping a DrawingSurface ref
+// field in ScriptDynamicSprite will increase memory consumption in rates
+// which are highly unproportional to the actual needs.
+// TODO: of course this should not be a standalone global variable,
+// but put into some kind of a manager.
+// NOTE: this is multimap, because old versions of the engine allowed multiple
+// script drawing surface objects per a sprite, and we may still restore older
+// saves.
+std::multimap<int, int> DynamicSpriteDSRef;
+
+ScriptDrawingSurface* get_dynsprite_surface(int slot)
+{
+    auto ref_it = DynamicSpriteDSRef.find(slot);
+    if ((ref_it != DynamicSpriteDSRef.end()) && (ref_it->second > 0))
+    {
+        return static_cast<ScriptDrawingSurface*>(ccGetObjectAddressFromHandle(ref_it->second));
+    }
+    return nullptr;
+}
+
+void attach_dynsprite_surface(int slot, int surface_handle)
+{
+    DynamicSpriteDSRef.insert(std::make_pair(slot, surface_handle));
+    // Mark the sprite info as having sprite's surface acquired (for notification purposes)
+    game.SpriteInfos[slot].Flags |= SPF_SURFACEACQUIRED;
+}
+
+void detach_dynsprite_surface(int slot)
+{
+    // Invalidate DrawingSurface (if one is currently acquired)
+    auto range = DynamicSpriteDSRef.equal_range(slot);
+    for (auto ref_it = range.first; ref_it != range.second; ++ref_it)
+    {
+        ScriptDrawingSurface *surf = static_cast<ScriptDrawingSurface *>(ccGetObjectAddressFromHandle(ref_it->second));
+        if (surf)
+            surf->Invalidate();
+    }
+    DynamicSpriteDSRef.erase(slot);
+}
+
 void on_dynsprite_surface_release(int slot, bool modified)
 {
     if (modified)
@@ -537,8 +556,8 @@ void on_dynsprite_surface_release(int slot, bool modified)
         game_sprite_updated(slot);
     }
 
-    DynamicSpriteDSRef.erase(slot);
-    // FIXME: must track the number of created drawing surface instances in dynamic sprite!
+    detach_dynsprite_surface(slot);
+    // Unmark the sprite info as having sprite's surface acquired (for notification purposes)
     game.SpriteInfos[slot].Flags &= ~SPF_SURFACEACQUIRED;
 }
 

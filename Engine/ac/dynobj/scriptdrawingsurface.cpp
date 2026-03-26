@@ -15,6 +15,7 @@
 #include "ac/common.h"
 #include "ac/draw.h"
 #include "ac/drawingsurface.h"
+#include "ac/dynamicsprite.h"
 #include "ac/gamestate.h"
 #include "ac/gamesetupstruct.h"
 #include "ac/spritecache.h"
@@ -111,6 +112,9 @@ void ScriptDrawingSurface::Unserialize(int index, Stream *in, size_t /*data_sz*/
     hasAlphaChannel = in->ReadInt32();
     isLinkedBitmapOnly = (in->ReadInt32() != 0);
     ccRegisterUnserializedObject(index, this, this);
+
+    if (dynamicSpriteNumber > 0)
+        attach_dynsprite_surface(dynamicSpriteNumber, index);
 }
 
 void ScriptDrawingSurface::Invalidate()
