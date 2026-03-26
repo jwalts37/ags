@@ -102,6 +102,7 @@ std::unique_ptr<MaskRouteFinder> room_pathfinder;
 RGB_MAP rgb_table;  // for 256-col antialiasing
 int new_room_flags=0;
 int gs_to_newroom=-1;
+// TODO: find a way to merge these with DynamicSpriteDSRef
 // Drawing Surface handles, for backgrounds
 int RoomBgDS[MAX_ROOM_BGFRAMES];
 // Drawing Surface handles, for room masks
@@ -123,14 +124,11 @@ ScriptDrawingSurface* Room_GetDrawingSurfaceForBackground(int backgroundNumber)
         return nullptr;
     }
 
-    if (RoomBgDS[backgroundNumber] > 0)
-    {
-        ScriptDrawingSurface *surface = static_cast<ScriptDrawingSurface*>(ccGetObjectAddressFromHandle(RoomBgDS[backgroundNumber]));
-        if (surface)
-            return surface;
-    }
+    ScriptDrawingSurface *surface = get_room_bg_surface(backgroundNumber);
+    if (surface)
+        return surface;
 
-    ScriptDrawingSurface *surface = new ScriptDrawingSurface();
+    surface = new ScriptDrawingSurface();
     surface->roomBackgroundNumber = backgroundNumber;
     ccRegisterManagedObject(surface, surface);
     return surface;
@@ -147,14 +145,11 @@ ScriptDrawingSurface* Room_GetDrawingSurfaceForMask(RoomAreaMask mask)
         return nullptr;
     }
 
-    if (RoomMaskDS[mask] > 0)
-    {
-        ScriptDrawingSurface *surface = static_cast<ScriptDrawingSurface*>(ccGetObjectAddressFromHandle(RoomMaskDS[mask]));
-        if (surface)
-            return surface;
-    }
+    ScriptDrawingSurface *surface = get_room_mask_surface(mask);
+    if (surface)
+        return surface;
 
-    ScriptDrawingSurface *surface = new ScriptDrawingSurface();
+    surface = new ScriptDrawingSurface();
     surface->roomMaskType = mask;
     ccRegisterManagedObject(surface, surface);
     return surface;
@@ -293,28 +288,6 @@ void convert_room_background_to_game_res()
     thisroom.MaskResolution = data_to_game_coord(thisroom.MaskResolution);
 }
 
-static void invalidate_room_drawingsurfaces()
-{
-    for (const auto &ds_handle : RoomBgDS)
-    {
-        if (ds_handle > 0)
-        {
-            ScriptDrawingSurface *surf = static_cast<ScriptDrawingSurface *>(ccGetObjectAddressFromHandle(ds_handle));
-            if (surf)
-                surf->Invalidate();
-        }
-    }
-    for (const auto &ds_handle : RoomMaskDS)
-    {
-        if (ds_handle > 0)
-        {
-            ScriptDrawingSurface *surf = static_cast<ScriptDrawingSurface *>(ccGetObjectAddressFromHandle(ds_handle));
-            if (surf)
-                surf->Invalidate();
-        }
-    }
-}
-
 void save_room_data_segment()
 {
     croom->FreeScriptData();
@@ -361,8 +334,8 @@ void unload_old_room()
             StopAmbientSound(ff);
     }
 
-    // Invalidate any active DrawingSurfaces connected to this room
-    invalidate_room_drawingsurfaces();
+    // Invalidate and detach any active DrawingSurfaces connected to this room
+    detach_room_bg_surfaces();
 
     cancel_all_scripts();
     events.clear();  // cancel any pending room events
@@ -1179,6 +1152,69 @@ void croom_ptr_clear()
 {
     croom = nullptr;
     objs = nullptr;
+}
+
+ScriptDrawingSurface *get_room_bg_surface(int bgindex)
+{
+    assert(bgindex >= 0 && bgindex < MAX_ROOM_BGFRAMES);
+    if (bgindex >= 0 && bgindex && RoomBgDS[bgindex] > 0)
+    {
+        ScriptDrawingSurface *surface = static_cast<ScriptDrawingSurface*>(ccGetObjectAddressFromHandle(RoomBgDS[bgindex]));
+        if (surface)
+            return surface;
+    }
+    return nullptr;
+}
+
+ScriptDrawingSurface *get_room_mask_surface(RoomAreaMask mask)
+{
+    assert(mask > kRoomAreaNone && mask < kNumRoomAreaTypes);
+    if (mask > kRoomAreaNone && mask < kNumRoomAreaTypes && RoomMaskDS[mask] > 0)
+    {
+        ScriptDrawingSurface *surface = static_cast<ScriptDrawingSurface*>(ccGetObjectAddressFromHandle(RoomMaskDS[mask]));
+        if (surface)
+            return surface;
+    }
+    return nullptr;
+}
+
+void attach_room_bg_surface(int bgindex, int surface_handle)
+{
+    assert(bgindex >= 0 && bgindex < MAX_ROOM_BGFRAMES);
+    if (bgindex >= 0 && bgindex < MAX_ROOM_BGFRAMES)
+        RoomBgDS[bgindex] = surface_handle;
+}
+
+void attach_room_mask_surface(RoomAreaMask mask, int surface_handle)
+{
+    assert(mask > kRoomAreaNone && mask < kNumRoomAreaTypes);
+    if (mask > kRoomAreaNone && mask < kNumRoomAreaTypes)
+        RoomMaskDS[mask] = surface_handle;
+}
+
+void detach_room_bg_surfaces()
+{
+    // Invalidate any linked DrawingSurfaces
+    for (auto &ds_handle : RoomBgDS)
+    {
+        if (ds_handle > 0)
+        {
+            ScriptDrawingSurface *surf = static_cast<ScriptDrawingSurface *>(ccGetObjectAddressFromHandle(ds_handle));
+            if (surf)
+                surf->Invalidate();
+            ds_handle = 0;
+        }
+    }
+    for (auto &ds_handle : RoomMaskDS)
+    {
+        if (ds_handle > 0)
+        {
+            ScriptDrawingSurface *surf = static_cast<ScriptDrawingSurface *>(ccGetObjectAddressFromHandle(ds_handle));
+            if (surf)
+                surf->Invalidate();
+            ds_handle = 0;
+        }
+    }
 }
 
 void on_room_bg_surface_release(int bgindex, bool modified)

@@ -19,6 +19,7 @@
 #include "ac/gamestate.h"
 #include "ac/gamesetupstruct.h"
 #include "ac/spritecache.h"
+#include "ac/room.h"
 #include "ac/runtime_defines.h"
 #include "ac/dynobj/dynobj_manager.h"
 #include "game/roomstruct.h"
@@ -106,7 +107,11 @@ void ScriptDrawingSurface::Unserialize(int index, Stream *in, size_t /*data_sz*/
     isLinkedBitmapOnly = (in->ReadInt32() != 0);
     ccRegisterUnserializedObject(index, this, this);
 
-    if (dynamicSpriteNumber > 0)
+    if (roomBackgroundNumber >= 0)
+        attach_room_bg_surface(roomBackgroundNumber, index);
+    else if (roomMaskType > kRoomAreaNone)
+        attach_room_mask_surface(roomMaskType, index);
+    else if (dynamicSpriteNumber > 0)
         attach_dynsprite_surface(dynamicSpriteNumber, index);
 }
 
