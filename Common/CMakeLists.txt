@@ -135,6 +135,7 @@ target_sources(common
     util/compress.h
     util/deflatestream.cpp
     util/deflatestream.h
+    util/delegate.h
     util/directory.cpp
     util/directory.h
     util/error.h
