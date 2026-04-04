@@ -1157,12 +1157,18 @@ void remove_sprite_changed_callback(int sprnum, ISpriteUser *user)
 
 void replace_sprite_changed_callback(int old_sprnum, int new_sprnum, ISpriteUser *user)
 {
-    if (old_sprnum != new_sprnum)
+    // NOTE: keep in mind that, because of how dynamic sprites are referenced in script,
+    // new dynamic sprites may accidentally get same IDs as previously deleted ones,
+    // so we cannot tell that if sprite numbers are equal then it's the same sprite.
+    if ((old_sprnum != new_sprnum) && (old_sprnum > 0))
     {
-        if (old_sprnum > 0)
-            remove_sprite_changed_callback(old_sprnum, user);
-        if (new_sprnum > 0)
-            add_sprite_changed_callback(new_sprnum, user);
+        remove_sprite_changed_callback(old_sprnum, user);
+    }
+
+    // NOTE: add_sprite_changed_callback will not add the same callback twice, so it's safe to call always
+    if (spriteset.DoesSpriteExist(new_sprnum) && game.SpriteInfos[new_sprnum].IsDynamicSprite())
+    {
+        add_sprite_changed_callback(new_sprnum, user);
     }
 }
 
@@ -1197,12 +1203,17 @@ void notify_sprite_changed(int sprnum, bool deleted)
         {
             if (it_notify->second.NotifyMark)
                 *it_notify->second.NotifyMark = UINT32_MAX; // set notification mark
+            it_notify->second.NotifyMark.reset(); // detach the notification mark
             it_notify->second.SpriteUpdated(sprnum); // run callback
 
-            if (deleted)
-                drawstate.SpriteNotifyMap.erase(sprnum); // remove the control entry
-            else
-                it_notify->second.NotifyMark.reset(); // detach the notification mark
+            // NOTE: only erase the notification object here if there are no registered
+            // callbacks left. Unfortunately, the mechanics of dynamic sprites in the
+            // engine are such that if a old sprite got deleted and a new one created
+            // immediately after, then there's a chance that it will get same ID.
+            // Many games have a oversight where they do not reassign a new sprite
+            // to an object, but it gets "hooked up" having accidentally same ID.
+            if (deleted && !it_notify->second.SpriteUpdated)
+                drawstate.SpriteNotifyMap.erase(it_notify); // remove the control entry
         }
     }
 }
